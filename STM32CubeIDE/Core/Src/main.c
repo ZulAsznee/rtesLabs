@@ -22,7 +22,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,21 +42,21 @@
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-
+uint8_t str[1];
+int RxCompleted = 0;
+int TxCompleted = 1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
-static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-int i = 0;
 /* USER CODE END 0 */
 
 /**
@@ -67,7 +66,7 @@ int i = 0;
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	uint8_t str[2];
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -89,11 +88,8 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
-
-  /* Initialize interrupts */
-  MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_UART_Receive_IT (&huart1, str, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -103,11 +99,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  sprintf ((char *) str, "%d", i);
-	  HAL_UART_Transmit (&huart1, (uint8_t*)"\r\nHELLO WORLD ", sizeof ("\r\nHELLO WORLD "), 20);
-	  HAL_UART_Transmit (&huart1, str, sizeof (str), 1000);
-	  i++;
-	  HAL_Delay (400);
   }
   /* USER CODE END 3 */
 }
@@ -145,17 +136,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-}
-
-/**
-  * @brief NVIC Configuration.
-  * @retval None
-  */
-static void MX_NVIC_Init(void)
-{
-  /* EXTI15_10_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
 /**
@@ -203,18 +183,47 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
-  /*Configure GPIO pin : PA13 */
-  GPIO_InitStruct.Pin = GPIO_PIN_13;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, LED3_Pin|LED2_Pin|LED1_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : LED3_Pin LED2_Pin LED1_Pin */
+  GPIO_InitStruct.Pin = LED3_Pin|LED2_Pin|LED1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if(huart == &huart1)
+	{
+		RxCompleted = 1;
 
+		if (TxCompleted == 1)
+		{
+			TxCompleted = 0;
+			HAL_UART_Transmit_IT (&huart1, str, 1);
+		}
+	}
 }
+
+void HAL_UART_TxCpltCallback (UART_HandleTypeDef *huart)
+{
+	if(huart == &huart1)
+	{
+		TxCompleted = 1;
+
+		if (RxCompleted == 1)
+		{
+			RxCompleted = 0;
+			HAL_UART_Receive_IT (&huart1, str, 1);
+		}
+	}
+}
+
 /* USER CODE END 4 */
 
 /**
