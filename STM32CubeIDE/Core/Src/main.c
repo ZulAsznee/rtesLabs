@@ -22,7 +22,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "string.h"
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -40,16 +41,16 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-SPI_HandleTypeDef hspi1;
+UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-uint16_t spi_buf[2] = {0};
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_SPI1_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -87,25 +88,58 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_SPI1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  HAL_GPIO_WritePin (SS_74HC165_GPIO_Port, SS_74HC165_Pin, GPIO_PIN_SET);
-  HAL_GPIO_WritePin (SS_74HC595_GPIO_Port, SS_74HC595_Pin, GPIO_PIN_SET);
+  uint32_t SIZE_ONE_PAGE = 0x400;
+  uint32_t ADDR_FLASH_PAGE = 0x08000000 + 31 * SIZE_ONE_PAGE; // адреса 64 сторінки 0x0800FC00
 
+  	size_t SIZE_uint32 = sizeof(uint32_t); // 32 біта це 4 байти
+  	// в одну сторінку розміром 1Кб можна записати 1024/4=256 змінних розміром 4 байти
+
+  	uint32_t val_000 = 0x01234567;
+  	uint32_t val_004 = 0x89ABCDEF;
+  	uint32_t val_00C = 0x01020304;
+  	uint32_t val_3FC = 0x0000FFFF; //1024-4=1020 == 0x400-0x004=0x3FC
+  	char word[6]={'s','i','z','e','o','f'};
+
+  	HAL_UART_Transmit(&huart1, (uint8_t*)"\n\n\r!!!Erase page 64!!!\n\r", sizeof("\n\n\r!!!Erase page 64!!!\n\r"), 100);
+  	Flash_Erase_One_Page(ADDR_FLASH_PAGE); // очищення 64 сторінки
+
+  	HAL_UART_Transmit(&huart1, (uint8_t*)"\n!!!Write!!!\n\r", sizeof("\n!!!Write!!!\n\r"), 100);
+  	// запис значень на початку і в кінці 127 сторінки
+  	Flash_Write_uint32(ADDR_FLASH_PAGE + 0 * SIZE_uint32, val_000);
+  	Flash_Write_uint32(ADDR_FLASH_PAGE + 1 * SIZE_uint32, val_004);
+  	Flash_Write_uint32(ADDR_FLASH_PAGE + 3 * SIZE_uint32, val_00C);
+  	Flash_Write_uint32(ADDR_FLASH_PAGE + 255 * SIZE_uint32, val_3FC);
+
+  	HAL_UART_Transmit(&huart1, (uint8_t*)"\n!!!Erase page 63!!!\n\r", sizeof("\n!!!Erase page 63!!!\n\r"), 100);
+  	Flash_Erase_One_Page(ADDR_FLASH_PAGE - SIZE_ONE_PAGE); // очищення 63 сторінки
+
+  	HAL_UART_Transmit(&huart1, (uint8_t*)"\n!!!Write!!!\n\r", sizeof("\n!!!Write!!!\n\r"), 100);
+  	// запис значень на початку і в кінці 126 сторінки
+
+  	Flash_Write_uint32(ADDR_FLASH_PAGE - SIZE_ONE_PAGE + 0x004, val_004);
+  	Flash_Write_uint32(ADDR_FLASH_PAGE - SIZE_ONE_PAGE + 0x00C, val_00C);
+  	Flash_Write_uint32(ADDR_FLASH_PAGE - SIZE_ONE_PAGE + 0x3FC, val_3FC);
+
+  	HAL_UART_Transmit(&huart1, (uint8_t*)"\n!!!Read!!!\n\r", sizeof("\n!!!Read!!!\n\r"), 100);
+  	// читання значень з 64 сторінки Flash-пам'яті
+/*  	uint32_t a = Flash_Read_uint32(ADDR_FLASH_PAGE + 0 * SIZE_uint32);
+  	uint32_t b = Flash_Read_uint32(ADDR_FLASH_PAGE + 1 * SIZE_uint32);
+  	uint32_t c = Flash_Read_uint32(ADDR_FLASH_PAGE + 3 * SIZE_uint32);
+  	uint32_t d = Flash_Read_uint32(ADDR_FLASH_PAGE + 255 * SIZE_uint32);*/
+
+  	HAL_UART_Transmit(&huart1, (uint8_t*)"\n!!!Write64!!!\n\r", sizeof("\n!!!Write64!!!\n\r"), 100);
+  	Flash_Write_uint64(ADDR_FLASH_PAGE - SIZE_ONE_PAGE + 0x000, 1844674407370955161);
+  	Flash_Write_uint8(0x08007800, word);
+  	Flash_Read_uint8(0x08007800, word);
+  	HAL_Delay(10000);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_GPIO_WritePin (SS_74HC165_GPIO_Port, SS_74HC165_Pin, GPIO_PIN_RESET);
-	  HAL_GPIO_WritePin (SS_74HC165_GPIO_Port, SS_74HC165_Pin, GPIO_PIN_SET);
-	  HAL_SPI_Receive (&hspi1, (uint8_t *) spi_buf, 1, 100);
-
-	  HAL_GPIO_WritePin (SS_74HC595_GPIO_Port, SS_74HC595_Pin, GPIO_PIN_RESET);
-	  HAL_SPI_Transmit (&hspi1, (uint8_t *) spi_buf, 1, 100);
-	  HAL_GPIO_WritePin (SS_74HC595_GPIO_Port, SS_74HC595_Pin, GPIO_PIN_SET);
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -149,40 +183,35 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief SPI1 Initialization Function
+  * @brief USART1 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_SPI1_Init(void)
+static void MX_USART1_UART_Init(void)
 {
 
-  /* USER CODE BEGIN SPI1_Init 0 */
+  /* USER CODE BEGIN USART1_Init 0 */
 
-  /* USER CODE END SPI1_Init 0 */
+  /* USER CODE END USART1_Init 0 */
 
-  /* USER CODE BEGIN SPI1_Init 1 */
+  /* USER CODE BEGIN USART1_Init 1 */
 
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_16BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 9600;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN SPI1_Init 2 */
+  /* USER CODE BEGIN USART1_Init 2 */
 
-  /* USER CODE END SPI1_Init 2 */
+  /* USER CODE END USART1_Init 2 */
 
 }
 
@@ -193,25 +222,167 @@ static void MX_SPI1_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, SS_74HC165_Pin|SS_74HC595_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pins : SS_74HC165_Pin SS_74HC595_Pin */
-  GPIO_InitStruct.Pin = SS_74HC165_Pin|SS_74HC595_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
 
 /* USER CODE BEGIN 4 */
+/////////////Функції запису та читання для 1 байтних масивів/////////////
+void Flash_Write_uint8(uint32_t MYADDR, char val[])
+{
+	char str[64] = { 0, };
+	for(int i = 0; i <= strlen(val); i++)
+	{
+		HAL_FLASH_Unlock();
+
+		if (HAL_FLASH_Program(0x0U, MYADDR, val[i]) != HAL_OK)
+		{
+			uint32_t er = HAL_FLASH_GetError();
+			snprintf(str, 64, "Error Flash_Write(): %lu\n\r", er);
+			HAL_UART_Transmit(&huart1, (uint8_t*) str, strlen(str), 100);
+			while (1)
+			{
+			}
+		}
+		MYADDR+=0x001;
+
+		HAL_FLASH_Lock();
+	}
+	snprintf(str, 64, "Write phrase bits %s to address 0x%08lX OK\n\r", val, MYADDR);
+	HAL_UART_Transmit(&huart1, (uint8_t*) str, strlen(str), 100);
+}
+
+void Flash_Read_uint8(uint32_t MYADDR, char val[])
+{
+	char str[64] = { 0, };
+
+	for(int i = 0; i <= strlen(val); i++){
+	uint8_t dig8 = *(uint8_t*) MYADDR;
+	str[i] = dig8;
+	MYADDR+=0x001;
+	}
+	HAL_UART_Transmit(&huart1, (uint8_t*)"\n!!!Read phrase!!!\n\r", sizeof("\n!!!Read phrase!!!\n\r"), 100);
+	HAL_UART_Transmit(&huart1, (uint8_t*) str, strlen(str), 100);
+}
+
+/////////////Функції запису для 16 біт/////////////
+
+void Flash_Write_uint16(uint32_t MYADDR, uint16_t val)
+{
+	char str[64] = { 0, };
+
+	HAL_FLASH_Unlock();
+
+	if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, MYADDR, val) != HAL_OK)
+	{
+		uint32_t er = HAL_FLASH_GetError();
+		snprintf(str, 64, "Error Flash_Write(): %lu\n\r", er);
+		HAL_UART_Transmit(&huart1, (uint8_t*) str, strlen(str), 100);
+		while (1)
+		{
+		}
+	}
+
+	snprintf(str, 64, "Write 16 bits (Hex: 0x%08X) to address 0x%08lX OK\n\r", val, MYADDR);
+	HAL_UART_Transmit(&huart1, (uint8_t*) str, strlen(str), 100);
+
+	HAL_FLASH_Lock();
+}
+
+/////////////Функції запису читання та стирання сторінки для 32 біт/////////////
+
+void Flash_Erase_One_Page(uint32_t MYADDR)
+{
+	FLASH_EraseInitTypeDef EraseInitStruct;
+
+	EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
+	EraseInitStruct.PageAddress = MYADDR;
+	EraseInitStruct.NbPages = 1;
+
+	uint32_t page_error = 0;
+
+	char str[64] = { 0, };
+
+	HAL_FLASH_Unlock();
+
+	if (HAL_FLASHEx_Erase(&EraseInitStruct, &page_error) != HAL_OK)
+	{
+		uint32_t er = HAL_FLASH_GetError();
+		snprintf(str, 64, "Error Flash_Erase(): %lu\n\r", er);
+		HAL_UART_Transmit(&huart1, (uint8_t*) str, strlen(str), 100);
+		while (1)
+		{
+		}
+	}
+
+	snprintf(str, 64, "Erase Flash from address 0x%08lX to address 0x%08lX OK\n\r", MYADDR, MYADDR+0x400-1);
+	HAL_UART_Transmit(&huart1, (uint8_t*) str, strlen(str), 100);
+
+	HAL_FLASH_Lock();
+}
+
+void Flash_Write_uint32(uint32_t MYADDR, uint32_t val)
+{
+	char str[64] = { 0, };
+
+	HAL_FLASH_Unlock();
+
+	if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MYADDR, val) != HAL_OK)
+	{
+		uint32_t er = HAL_FLASH_GetError();
+		snprintf(str, 64, "Error Flash_Write(): %lu\n\r", er);
+		HAL_UART_Transmit(&huart1, (uint8_t*) str, strlen(str), 100);
+		while (1)
+		{
+		}
+	}
+
+	snprintf(str, 64, "Write 32 bits (Hex: 0x%08lX) to address 0x%08lX OK\n\r", val, MYADDR);
+	HAL_UART_Transmit(&huart1, (uint8_t*) str, strlen(str), 100);
+
+	HAL_FLASH_Lock();
+}
+
+uint32_t Flash_Read_uint32(uint32_t MYADDR)
+{
+	char str[64] = { 0, };
+
+
+	uint32_t dig32 = *(uint32_t*) MYADDR;
+
+	snprintf(str, 64, "Read 32 bits (Dec: %lu \tHex: 0x%08lX)", dig32, dig32);
+	HAL_UART_Transmit(&huart1, (uint8_t*) str, strlen(str), 100);
+	snprintf(str, 64, " from address 0x%08lX \n\r", MYADDR);
+	HAL_UART_Transmit(&huart1, (uint8_t*) str, strlen(str), 100);
+
+	return dig32;
+}
+
+	/////////////Функції запису для 64біт/////////////
+
+void Flash_Write_uint64(uint32_t MYADDR, uint64_t val)
+{
+	char str[64] = { 0, };
+
+	HAL_FLASH_Unlock();
+
+	if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, MYADDR, val) != HAL_OK)
+	{
+		uint32_t er = HAL_FLASH_GetError();
+		snprintf(str, 64, "Error Flash_Write(): %lu\n\r", er);
+		HAL_UART_Transmit(&huart1, (uint8_t*) str, strlen(str), 100);
+		while (1)
+		{
+		}
+	}
+
+	snprintf(str, 64, "Write 64 bits (Hex: 0x%08llX) to address 0x%08lX OK\n\r", val, MYADDR);
+	HAL_UART_Transmit(&huart1, (uint8_t*) str, strlen(str), 100);
+
+	HAL_FLASH_Lock();
+}
 
 /* USER CODE END 4 */
 
