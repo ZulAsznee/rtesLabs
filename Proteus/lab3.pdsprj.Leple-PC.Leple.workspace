@@ -16,10 +16,9 @@
   <PWI>
    <POPUP w="400" x="217" flags="00000002" y="92" h="100" pid="0" iid="-1">
     <PROPERTIES>
-     <ITEM name="Message Column Width">158</ITEM>
+     <ITEM name="Message Column Width">279</ITEM>
      <ITEM name="ShowGrid">No</ITEM>
      <ITEM name="Source Column Width">100</ITEM>
-     <ITEM name="Time Column Width">120</ITEM>
      <ITEM name="Version">100</ITEM>
     </PROPERTIES>
    </POPUP>

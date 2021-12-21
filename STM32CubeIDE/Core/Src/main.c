@@ -43,12 +43,12 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-int a = 0;
-int b = -1;
+int i = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -65,6 +65,7 @@ void SystemClock_Config(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -85,6 +86,9 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+
+  /* Initialize interrupts */
+  MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -93,76 +97,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if(HAL_GPIO_ReadPin (GPIOA, GPIO_PIN_15) == GPIO_PIN_SET)
-	  {
-		  if(++a >= 5)
-		  {
-			  a = 1;
-		  }
-	  }
-
-	  if(HAL_GPIO_ReadPin (GPIOA, GPIO_PIN_14) == GPIO_PIN_SET)
-	  {
-	  		  b++;
-	  		  if (b > 5)
-	  		  {
-	  			  b = 0;
-	  		  }
-	  }
-
-
-	  HAL_Delay (400);
-
-
-	  switch (a)
-	  {
-		case 1:
-			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_11, GPIO_PIN_SET);
-			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
-			break;
-
-		case 2:
-			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
-			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);
-			break;
-
-		case 3:
-			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
-			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
-			break;
-
-		case 4:
-			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
-			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_11, GPIO_PIN_RESET);
-			break;
-	 }
-
-	  switch (b)
-	  {
-	  		case 1:
-	  			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
-	  			break;
-
-	  		case 2:
-	  			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);
-	  			break;
-
-	  		case 3:
-	  			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
-	  			break;
-
-	  		case 4:
-	  			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_11, GPIO_PIN_RESET);
-	  			break;
-
-	  		case 5:
-	  			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
-	  			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
-	  			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
-	  			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_11, GPIO_PIN_SET);
-	  			break;
-	  	}
-	/* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
@@ -204,8 +139,74 @@ void SystemClock_Config(void)
   }
 }
 
-/* USER CODE BEGIN 4 */
+/**
+  * @brief NVIC Configuration.
+  * @retval None
+  */
+static void MX_NVIC_Init(void)
+{
+  /* EXTI15_10_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+}
 
+/* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if (GPIO_Pin == GPIO_PIN_12)
+	{
+		if (++i > 8)
+		{
+			i = 8;
+		}
+	}
+
+	if (GPIO_Pin == GPIO_PIN_13)
+	{
+		if(--i < 0)
+		{
+			i = 0;
+		}
+	}
+
+	switch (i)
+	{
+		case 2:
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_11, GPIO_PIN_SET);
+			break;
+
+		case 4:
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_11, GPIO_PIN_SET);
+			break;
+
+		case 6:
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_11, GPIO_PIN_SET);
+			break;
+
+		case 8:
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_11, GPIO_PIN_RESET);
+			break;
+
+		default:
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
+			HAL_GPIO_WritePin (GPIOB, GPIO_PIN_11, GPIO_PIN_SET);
+			break;
+	}
+}
 /* USER CODE END 4 */
 
 /**
@@ -240,4 +241,3 @@ void assert_failed(uint8_t *file, uint32_t line)
 }
 #endif /* USE_FULL_ASSERT */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
